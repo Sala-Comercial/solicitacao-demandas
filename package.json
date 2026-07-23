@@ -1,0 +1,30 @@
+{
+  "name": "lab-ia-clickup-portal",
+  "version": "1.0.0",
+  "description": "Portal interno para abertura de demandas com criação de tasks no ClickUp",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "discover:clickup": "node scripts/discover-clickup.js",
+    "diagnose:clickup": "node scripts/diagnose-clickup.js",
+    "smoke:task": "node scripts/smoke-create-task.js"
+  },
+  "keywords": [
+    "clickup",
+    "openai",
+    "portal",
+    "demandas"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "multer": "^2.0.2",
+    "openai": "^4.104.0"
+  }
+}
