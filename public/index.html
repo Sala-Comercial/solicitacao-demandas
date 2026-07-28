@@ -32,8 +32,18 @@
       }
       .subtitle {
         color: var(--muted);
-        margin: 0 0 24px;
+        margin: 0 0 16px;
         font-size: 14px;
+      }
+      .info-banner {
+        background: #eef3fb;
+        border: 1px solid #cfe0f5;
+        color: #1c3b63;
+        border-radius: 10px;
+        padding: 13px 16px;
+        font-size: 13.5px;
+        line-height: 1.5;
+        margin: 0 0 24px;
       }
       .card {
         background: #fff;
@@ -184,58 +194,74 @@
       <h1>Solicitar Demanda</h1>
       <p class="subtitle">Abra uma demanda para o time. Cada envio cria automaticamente uma task no ClickUp.</p>
 
+      <p class="info-banner">
+        Quanto mais informações você nos der agora, melhor e mais preciso será o trabalho entregue. Detalhe o contexto, o objetivo e o que espera como resultado. Se preferir, grave um áudio explicando a demanda.
+      </p>
+
       <section class="card">
         <form id="demandForm">
           <div class="grid">
+            <div class="field full">
+              <label for="title">Título da demanda *</label>
+              <input id="title" name="title" placeholder="Resuma em uma frase o que você precisa" required />
+            </div>
             <div class="field">
-              <label for="title">Titulo *</label>
-              <input id="title" name="title" required />
+              <label for="demandType">Tipo de demanda *</label>
+              <select id="demandType" name="demandType" required>
+                <option value="" disabled selected>Selecione...</option>
+                <option value="Figma">Figma</option>
+                <option value="Sistema (VibeCode)">Sistema (VibeCode)</option>
+                <option value="HubSpot (alterações)">HubSpot (alterações)</option>
+                <option value="App SASI">App SASI</option>
+                <option value="Outro">Outro</option>
+              </select>
             </div>
             <div class="field">
               <label for="priority">Prioridade</label>
               <select id="priority" name="priority">
                 <option value="baixa">Baixa</option>
-                <option value="media" selected>Media</option>
+                <option value="media" selected>Média</option>
                 <option value="alta">Alta</option>
                 <option value="urgente">Urgente</option>
               </select>
             </div>
             <div class="field">
-              <label for="requester">Solicitante *</label>
-              <input id="requester" name="requester" required />
+              <label for="requester">Nome do solicitante *</label>
+              <input id="requester" name="requester" placeholder="Quem está pedindo a demanda" required />
             </div>
             <div class="field">
-              <label for="area">Area *</label>
-              <input id="area" name="area" required />
+              <label for="area">Área do solicitante *</label>
+              <select id="area" name="area" required>
+                <option value="" disabled selected>Selecione...</option>
+                <option value="Comercial">Comercial</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Outro">Outro</option>
+              </select>
             </div>
             <div class="field">
-              <label for="team">Time destino *</label>
-              <input id="team" name="team" required />
+              <label for="contact">Contato do solicitante</label>
+              <input id="contact" name="contact" placeholder="E-mail, ramal ou WhatsApp" />
             </div>
             <div class="field">
-              <label for="contact">Contato</label>
-              <input id="contact" name="contact" />
-            </div>
-            <div class="field">
-              <label for="dueDate">Prazo desejado</label>
+              <label for="dueDate">Prazo de entrega desejado</label>
               <input id="dueDate" name="dueDate" placeholder="AAAA-MM-DD ou texto livre" />
             </div>
           </div>
 
           <div class="field full" style="margin-top: 16px">
-            <label>Gravacao</label>
+            <label>Gravação</label>
             <div class="record-box">
               <button type="button" id="recordBtn" class="record-btn">
                 <span class="dot"></span>
                 <span id="recordLabel">GRAVAR</span>
               </button>
-              <p class="hint" id="recordHint">Grave um audio para transcrever automaticamente na Descricao.</p>
+              <p class="hint" id="recordHint">Grave um áudio para transcrever automaticamente na Descrição.</p>
             </div>
           </div>
 
           <div class="field full" style="margin-top: 16px">
-            <label for="description">Descricao</label>
-            <textarea id="description" name="description" placeholder="Descreva a demanda ou grave um audio acima."></textarea>
+            <label for="description">Descrição detalhada</label>
+            <textarea id="description" name="description" placeholder="Explique o contexto, o objetivo e o resultado esperado. Ou grave um áudio acima."></textarea>
           </div>
 
           <div class="actions">
@@ -291,7 +317,7 @@
           recordLabel.textContent = "PARAR";
           setHint("Gravando... clique em PARAR quando terminar.");
         } catch (error) {
-          showMessage("error", `Nao foi possivel acessar o microfone: ${error.message}`);
+          showMessage("error", `Não foi possível acessar o microfone: ${error.message}`);
         }
       }
 
@@ -305,7 +331,7 @@
 
       async function transcribeRecording() {
         if (!recordedBlob) return;
-        setHint("Transcrevendo audio...");
+        setHint("Transcrevendo áudio...");
         recordBtn.disabled = true;
 
         const data = new FormData();
@@ -315,22 +341,22 @@
           const response = await fetch("/api/transcribe", { method: "POST", body: data });
           const payload = await response.json();
           if (!response.ok) {
-            throw new Error(payload.details || payload.error || "Falha na transcricao");
+            throw new Error(payload.details || payload.error || "Falha na transcrição");
           }
 
           const transcript = (payload.text || "").trim();
           if (!transcript) {
-            setHint("Nenhuma fala detectada no audio. Tente novamente.");
+            setHint("Nenhuma fala detectada no áudio. Tente novamente.");
             return;
           }
 
           descriptionEl.value = descriptionEl.value
             ? `${descriptionEl.value}\n\n${transcript}`
             : transcript;
-          setHint("Transcricao adicionada a Descricao. Voce pode editar antes de registrar.");
+          setHint("Transcrição adicionada à Descrição. Você pode editar antes de registrar.");
         } catch (error) {
           setHint("Falha ao transcrever.");
-          showMessage("error", `Erro na transcricao: ${error.message}`);
+          showMessage("error", `Erro na transcrição: ${error.message}`);
         } finally {
           recordBtn.disabled = false;
         }
@@ -347,7 +373,7 @@
       form.addEventListener("reset", () => {
         recordedBlob = null;
         result.className = "result";
-        setHint("Grave um audio para transcrever automaticamente na Descricao.");
+        setHint("Grave um áudio para transcrever automaticamente na Descrição.");
       });
 
       form.addEventListener("submit", async (event) => {
@@ -371,7 +397,7 @@
             `Protocolo: ${payload.protocol}`,
             `Task criada: ${payload.clickupTaskId}`,
             payload.clickupTaskUrl ? `Link: ${payload.clickupTaskUrl}` : null,
-            payload.duplicated ? "(Solicitacao ja existente - evitada duplicidade)" : null
+            payload.duplicated ? "(Solicitação já existente, duplicidade evitada)" : null
           ].filter(Boolean);
 
           showMessage("ok", lines.join("\n"));

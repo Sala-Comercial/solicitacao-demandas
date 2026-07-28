@@ -85,8 +85,8 @@ Campos esperados:
 
 - `title` (obrigatorio)
 - `requester` (obrigatorio)
-- `area` (obrigatorio)
-- `team` (obrigatorio)
+- `area` (obrigatorio, `Comercial|Marketing|Outro`)
+- `demandType` (obrigatorio, `Figma|Sistema (VibeCode)|HubSpot (alteracoes)|App SASI|Outro`)
 - `priority` (`baixa|media|alta|urgente`)
 - `contact`
 - `dueDate`

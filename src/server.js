@@ -68,9 +68,9 @@ function buildTaskDescription(data) {
     data.description || "Sem descricao informada",
     "",
     "## Detalhes da solicitacao",
+    `- Tipo de demanda: ${data.demandType || "Nao informado"}`,
     `- Solicitante: ${data.requester || "Nao informado"}`,
     `- Area: ${data.area || "Nao informado"}`,
-    `- Time destino: ${data.team || "Nao informado"}`,
     `- Prioridade: ${data.priority || "Nao informado"}`,
     `- Prazo desejado: ${data.dueDate || "Nao informado"}`,
     `- Canal de contato: ${data.contact || "Nao informado"}`
@@ -201,15 +201,15 @@ app.post("/api/requests", upload.single("audio"), async (req, res) => {
     const title = String(req.body.title || "").trim();
     const requester = String(req.body.requester || "").trim();
     const area = String(req.body.area || "").trim();
-    const team = String(req.body.team || "").trim();
+    const demandType = String(req.body.demandType || "").trim();
     const contact = String(req.body.contact || "").trim();
     const dueDate = String(req.body.dueDate || "").trim();
     const description = String(req.body.description || "").trim();
     const priority = normalizePriority(req.body.priority);
 
-    if (!title || !requester || !area || !team) {
+    if (!title || !requester || !area || !demandType) {
       return res.status(400).json({
-        error: "Missing required fields: title, requester, area, team"
+        error: "Missing required fields: title, requester, area, demandType"
       });
     }
 
@@ -217,7 +217,7 @@ app.post("/api/requests", upload.single("audio"), async (req, res) => {
       title,
       requester,
       area,
-      team,
+      demandType,
       contact,
       dueDate,
       description,
@@ -242,7 +242,7 @@ app.post("/api/requests", upload.single("audio"), async (req, res) => {
         description,
         requester,
         area,
-        team,
+        demandType,
         priority,
         dueDate,
         contact
