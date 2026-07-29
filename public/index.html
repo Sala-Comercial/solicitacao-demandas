@@ -3,212 +3,714 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Portal de Demandas Internas</title>
+    <title>Intake de demandas · Time de IA · SASI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="/assets/ia-labs-mark.svg" />
     <style>
       :root {
-        color-scheme: light;
-        --navy: #16233d;
-        --navy-2: #1f3a5f;
-        --line: #e3e7ef;
-        --muted: #6b7280;
-        font-family: "Segoe UI", Arial, sans-serif;
+        color-scheme: dark;
+
+        --void: #0b0c0b;
+        --panel: #121412;
+        --panel-2: #171a17;
+        --rule: #262a26;
+        --rule-2: #343a34;
+        --text: #e5e8e3;
+        --muted: #8b918a;
+        --dim: #5f655e;
+
+        /* azul da marca IA Labs */
+        --signal: #6e7cc7;
+        --signal-lift: #8f9bda;
+        --signal-dim: rgba(110, 124, 199, 0.12);
+        --warn: #f2a63b;
+        --err: #ff6f5c;
+        --err-dim: rgba(255, 111, 92, 0.1);
+
+        --mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+        --sans: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
       }
-      * {
+
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
       }
+
       body {
         margin: 0;
-        background: #f4f6fa;
-        color: #1c2536;
+        background: var(--void);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
       }
-      .container {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 32px 20px 64px;
+
+      ::selection {
+        background: var(--signal);
+        color: var(--void);
       }
-      h1 {
-        margin: 0 0 4px;
-        font-size: 24px;
+
+      :focus-visible {
+        outline: 2px solid var(--signal);
+        outline-offset: 2px;
       }
-      .subtitle {
-        color: var(--muted);
-        margin: 0 0 16px;
-        font-size: 14px;
+
+      /* ---------- console status bar ---------- */
+
+      .statusbar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        border-bottom: 1px solid var(--rule);
+        padding: 0.7rem clamp(1rem, 4vw, 2.5rem);
+        font-family: var(--mono);
+        font-size: 0.6875rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--dim);
+        position: sticky;
+        top: 0;
+        background: rgba(11, 12, 11, 0.92);
+        backdrop-filter: blur(6px);
+        z-index: 10;
       }
-      .info-banner {
-        background: #eef3fb;
-        border: 1px solid #cfe0f5;
-        color: #1c3b63;
-        border-radius: 10px;
-        padding: 13px 16px;
-        font-size: 13.5px;
-        line-height: 1.5;
-        margin: 0 0 24px;
+
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
       }
-      .card {
-        background: #fff;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 22px;
-        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-      }
-      .grid {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: repeat(2, 1fr);
-      }
-      .field.full {
-        grid-column: 1 / -1;
-      }
-      label {
+
+      .brand-lockup img {
+        width: 1.15rem;
+        height: 1.15rem;
         display: block;
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 6px;
-        color: #344054;
       }
+
+      .brand-lockup .wordmark {
+        font-family: var(--mono);
+        font-size: 0.8125rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--signal);
+      }
+
+      .brand-lockup .wordmark span {
+        color: var(--text);
+        font-weight: 400;
+      }
+
+      .statusbar .sep {
+        color: var(--rule-2);
+      }
+
+      .statusbar .right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .pulse {
+        width: 0.4rem;
+        height: 0.4rem;
+        border-radius: 50%;
+        background: var(--signal);
+      }
+
+      /* ---------- layout ---------- */
+
+      .shell {
+        display: grid;
+        grid-template-columns: minmax(0, 32fr) minmax(0, 68fr);
+        gap: clamp(2rem, 5vw, 5rem);
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: clamp(2.5rem, 5vw, 4.5rem) clamp(1rem, 4vw, 2.5rem) 7rem;
+      }
+
+      @media (max-width: 940px) {
+        .shell {
+          grid-template-columns: 1fr;
+          gap: 2.75rem;
+        }
+      }
+
+      .rail {
+        align-self: start;
+      }
+
+      @media (min-width: 941px) {
+        .rail {
+          position: sticky;
+          top: 5.5rem;
+        }
+      }
+
+      /* ---------- rail ---------- */
+
+      .tag {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.625rem;
+        font-weight: 500;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--signal);
+        border: 1px solid var(--rule-2);
+        padding: 0.25rem 0.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      h1 {
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: clamp(1.75rem, 3.4vw, 2.5rem);
+        line-height: 1.08;
+        letter-spacing: -0.035em;
+        text-wrap: balance;
+        margin: 0 0 1.25rem;
+      }
+
+      h1 span {
+        color: var(--signal);
+      }
+
+      .lede {
+        font-size: 0.9375rem;
+        line-height: 1.7;
+        color: var(--muted);
+        text-wrap: pretty;
+        max-width: 36ch;
+        margin: 0 0 2rem;
+      }
+
+      .spec {
+        margin: 0;
+        border-top: 1px solid var(--rule);
+      }
+
+      .spec div {
+        display: grid;
+        grid-template-columns: 2.5rem 1fr;
+        gap: 0.75rem;
+        padding: 0.7rem 0;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .spec dt {
+        font-family: var(--mono);
+        font-size: 0.6875rem;
+        color: var(--signal);
+        padding-top: 0.2rem;
+      }
+
+      .spec dd {
+        margin: 0;
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      /* ---------- form ---------- */
+
+      .form-area {
+        min-width: 0;
+      }
+
+      .sec {
+        margin: 0 0 2.75rem;
+      }
+
+      .sec-head {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text);
+        margin: 0 0 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .sec-num {
+        color: var(--signal);
+      }
+
+      .sec-note {
+        margin-left: auto;
+        letter-spacing: 0.06em;
+        text-transform: none;
+        color: var(--dim);
+        font-size: 0.6875rem;
+      }
+
+      .field {
+        margin-bottom: 1.4rem;
+      }
+
+      .field:last-child {
+        margin-bottom: 0;
+      }
+
+      label,
+      .fieldlabel {
+        display: block;
+        font-family: var(--mono);
+        font-size: 0.6875rem;
+        font-weight: 500;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 0.45rem;
+      }
+
+      .req {
+        color: var(--signal);
+        margin-left: 0.2em;
+      }
+
+      .help {
+        font-family: var(--sans);
+        font-size: 0.8125rem;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--dim);
+        margin: 0.4rem 0 0;
+      }
+
       input,
       select,
       textarea {
         width: 100%;
-        border: 1px solid #cfd6e4;
-        border-radius: 9px;
-        padding: 11px 12px;
-        font-size: 14px;
-        background: #fff;
-        transition: border-color 0.15s, box-shadow 0.15s;
+        font-family: var(--sans);
+        font-size: 0.9375rem;
+        line-height: 1.5;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-radius: 0;
+        padding: 0.7rem 0.85rem;
+        caret-color: var(--signal);
+        transition: border-color 0.12s linear, background-color 0.12s linear;
       }
+
+      input::placeholder,
+      textarea::placeholder {
+        color: var(--dim);
+      }
+
+      input:hover,
+      select:hover,
+      textarea:hover {
+        border-color: var(--rule-2);
+      }
+
       input:focus,
       select:focus,
       textarea:focus {
         outline: none;
-        border-color: var(--navy-2);
-        box-shadow: 0 0 0 3px rgba(31, 58, 95, 0.12);
+        border-color: var(--signal);
+        background: var(--panel-2);
       }
+
+      select {
+        appearance: none;
+        background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+          linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+        background-position: calc(100% - 1.1rem) 1.15rem, calc(100% - 0.75rem) 1.15rem;
+        background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
+        background-repeat: no-repeat;
+        padding-right: 2.25rem;
+      }
+
       textarea {
-        min-height: 150px;
+        min-height: 11rem;
         resize: vertical;
+        line-height: 1.65;
       }
-      .record-box {
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 16px;
-        background: #fbfcfe;
+
+      .w-sm { max-width: 12rem; }
+      .w-md { max-width: 18rem; }
+      .w-lg { max-width: 25rem; }
+
+      /* ---------- recorder instrument ---------- */
+
+      .recorder {
+        border: 1px solid var(--rule);
+        background: var(--panel);
+        padding: 1rem;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 1rem;
+        align-items: center;
       }
-      .record-btn {
+
+      @media (max-width: 560px) {
+        .recorder {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .rec-btn {
         display: inline-flex;
         align-items: center;
-        gap: 9px;
+        gap: 0.55rem;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--void);
+        background: var(--signal);
         border: 0;
-        background: var(--navy);
-        color: #fff;
-        font-weight: 600;
-        font-size: 14px;
-        padding: 11px 20px;
-        border-radius: 9px;
+        border-radius: 0;
+        padding: 0.7rem 1.1rem;
         cursor: pointer;
-        transition: background 0.15s;
+        transition: opacity 0.12s linear;
       }
-      .record-btn:hover {
-        background: var(--navy-2);
+
+      .rec-btn:hover:not(:disabled) {
+        opacity: 0.82;
       }
-      .record-btn.recording {
-        background: #b42318;
-      }
-      .record-btn .dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 50%;
-        background: #ff5c5c;
-      }
-      .record-btn.recording .dot {
-        animation: pulse 1s infinite;
-      }
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.25; }
-      }
-      .hint {
-        color: var(--muted);
-        font-size: 13px;
-        margin-top: 10px;
-      }
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 12px;
-        margin-top: 24px;
-      }
-      .btn {
-        border-radius: 9px;
-        padding: 12px 26px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        border: 1px solid transparent;
-      }
-      .btn-secondary {
-        background: #fff;
-        border-color: #cfd6e4;
-        color: #344054;
-      }
-      .btn-primary {
-        background: var(--navy);
-        color: #fff;
-      }
-      .btn-primary:hover {
-        background: var(--navy-2);
-      }
-      .btn-primary:disabled {
-        opacity: 0.6;
+
+      .rec-btn:disabled {
+        opacity: 0.4;
         cursor: not-allowed;
       }
-      .result {
-        margin-top: 16px;
-        padding: 13px 14px;
-        border-radius: 9px;
-        font-size: 14px;
-        white-space: pre-wrap;
+
+      .rec-btn[data-state="recording"] {
+        background: var(--err);
+        color: #fff;
+      }
+
+      .rec-dot {
+        width: 0.45rem;
+        height: 0.45rem;
+        border-radius: 50%;
+        background: currentColor;
+        flex: none;
+      }
+
+      .rec-btn[data-state="recording"] .rec-dot {
+        animation: blink 1s steps(2, start) infinite;
+      }
+
+      @keyframes blink {
+        to { opacity: 0.1; }
+      }
+
+      .rec-readout {
+        min-width: 0;
+      }
+
+      .rec-line {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .rec-time {
+        font-family: var(--mono);
+        font-size: 0.9375rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+      }
+
+      /* live input level meter */
+      .meter {
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+        height: 1.5rem;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .meter i {
+        flex: 1;
+        min-width: 2px;
+        height: 100%;
+        background: var(--rule-2);
+        transform: scaleY(0.08);
+        transform-origin: bottom;
+        transition: background-color 0.2s linear;
+      }
+
+      .meter[data-live="true"] i {
+        background: var(--signal);
+      }
+
+      .rec-status {
+        font-size: 0.8125rem;
+        color: var(--muted);
+        text-wrap: pretty;
+        margin: 0;
+      }
+
+      /* ---------- actions ---------- */
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        padding-top: 1.75rem;
+        border-top: 1px solid var(--rule);
+        flex-wrap: wrap;
+      }
+
+      .btn-submit {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--void);
+        background: var(--signal);
+        border: 0;
+        border-radius: 0;
+        padding: 0.9rem 1.75rem;
+        cursor: pointer;
+        transition: opacity 0.12s linear;
+      }
+
+      .btn-submit:hover:not(:disabled) {
+        opacity: 0.82;
+      }
+
+      .btn-submit:disabled {
+        opacity: 0.4;
+        cursor: wait;
+      }
+
+      .btn-text {
+        font-family: var(--mono);
+        font-size: 0.6875rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        background: none;
+        border: 0;
+        padding: 0.5rem 0;
+        cursor: pointer;
+      }
+
+      .btn-text:hover {
+        color: var(--text);
+      }
+
+      .required-note {
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: 0.625rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+      }
+
+      /* ---------- feedback ---------- */
+
+      .alert {
+        border-left: 2px solid var(--err);
+        background: var(--err-dim);
+        color: var(--err);
+        padding: 0.8rem 1rem;
+        margin-top: 1.25rem;
+        font-family: var(--mono);
+        font-size: 0.8125rem;
+        text-wrap: pretty;
+      }
+
+      .alert:empty {
         display: none;
       }
-      .result.show {
-        display: block;
+
+      /* ---------- receipt ---------- */
+
+      .receipt[hidden] {
+        display: none;
       }
-      .ok {
-        background: #e8f6ec;
-        color: #1b6130;
+
+      .receipt {
+        border: 1px solid var(--rule-2);
+        background: var(--panel);
+        padding: clamp(1.5rem, 4vw, 2.25rem);
       }
-      .error {
-        background: #fde9ec;
-        color: #8f2130;
+
+      .receipt-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: var(--mono);
+        font-size: 0.625rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--signal);
+        margin: 0 0 1rem;
       }
-      @media (max-width: 620px) {
-        .grid {
+
+      .receipt h2 {
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 1.375rem;
+        line-height: 1.2;
+        letter-spacing: -0.025em;
+        margin: 0 0 1.75rem;
+        text-wrap: balance;
+      }
+
+      .receipt dl {
+        margin: 0 0 1.75rem;
+        border-top: 1px solid var(--rule);
+      }
+
+      .receipt dl div {
+        display: grid;
+        grid-template-columns: 8rem 1fr;
+        gap: 1rem;
+        padding: 0.65rem 0;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .receipt dt {
+        font-family: var(--mono);
+        font-size: 0.625rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        padding-top: 0.25rem;
+      }
+
+      .receipt dd {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 0.875rem;
+        color: var(--text);
+        word-break: break-all;
+      }
+
+      .receipt a {
+        color: var(--signal);
+        text-underline-offset: 0.2em;
+      }
+
+      @media (max-width: 520px) {
+        .receipt dl div {
           grid-template-columns: 1fr;
+          gap: 0.15rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
   </head>
   <body>
-    <main class="container">
-      <h1>Solicitar Demanda</h1>
-      <p class="subtitle">Abra uma demanda para o time. Cada envio cria automaticamente uma task no ClickUp.</p>
+    <div class="statusbar">
+      <span class="brand-lockup">
+        <img src="/assets/ia-labs-mark.svg" alt="" />
+        <span class="wordmark">IA <span>LABS</span></span>
+      </span>
+      <span class="sep">//</span>
+      <span>Intake de demandas</span>
+      <span class="right">
+        <span class="pulse" aria-hidden="true"></span>
+        <span>Ativo</span>
+      </span>
+    </div>
 
-      <p class="info-banner">
-        Quanto mais informações você nos der agora, melhor e mais preciso será o trabalho entregue. Detalhe o contexto, o objetivo e o que espera como resultado. Se preferir, grave um áudio explicando a demanda.
-      </p>
+    <div class="shell">
+      <aside class="rail">
+        <p class="tag">IA Labs · Solicitações</p>
+        <h1>Abertura de <span>demandas</span></h1>
+        <p class="lede">
+          Quanto mais informação você trouxer agora, mais preciso será o resultado. Descreva o contexto,
+          o objetivo e como saberemos que a entrega ficou pronta.
+        </p>
+        <dl class="spec">
+          <div>
+            <dt>01</dt>
+            <dd>Você descreve a demanda, por escrito ou por áudio.</dd>
+          </div>
+          <div>
+            <dt>02</dt>
+            <dd>O áudio é transcrito automaticamente para a descrição.</dd>
+          </div>
+          <div>
+            <dt>03</dt>
+            <dd>A solicitação entra no quadro do time para priorização.</dd>
+          </div>
+          <div>
+            <dt>04</dt>
+            <dd>Você recebe um protocolo para acompanhar o andamento.</dd>
+          </div>
+        </dl>
+      </aside>
 
-      <section class="card">
-        <form id="demandForm">
-          <div class="grid">
-            <div class="field full">
-              <label for="title">Título da demanda *</label>
+      <main class="form-area">
+        <form id="demandForm" novalidate>
+          <section class="sec">
+            <h2 class="sec-head">
+              <span class="sec-num">01</span>
+              <span>Solicitante</span>
+            </h2>
+
+            <div class="field">
+              <label for="requester">Nome<span class="req" aria-hidden="true">*</span></label>
+              <input id="requester" name="requester" class="w-lg" autocomplete="name" required />
+            </div>
+
+            <div class="field">
+              <label for="area">Área<span class="req" aria-hidden="true">*</span></label>
+              <select id="area" name="area" class="w-md" required>
+                <option value="" disabled selected>Selecione</option>
+                <option value="Comercial">Comercial</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Outro">Outro</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="contact">Contato</label>
+              <input id="contact" name="contact" class="w-lg" placeholder="E-mail, ramal ou WhatsApp" />
+              <p class="help">Por onde falamos com você se surgir alguma dúvida.</p>
+            </div>
+          </section>
+
+          <section class="sec">
+            <h2 class="sec-head">
+              <span class="sec-num">02</span>
+              <span>A demanda</span>
+            </h2>
+
+            <div class="field">
+              <label for="title">Título<span class="req" aria-hidden="true">*</span></label>
               <input id="title" name="title" placeholder="Resuma em uma frase o que você precisa" required />
             </div>
+
             <div class="field">
-              <label for="demandType">Tipo de demanda *</label>
-              <select id="demandType" name="demandType" required>
-                <option value="" disabled selected>Selecione...</option>
+              <label for="demandType">Tipo<span class="req" aria-hidden="true">*</span></label>
+              <select id="demandType" name="demandType" class="w-md" required>
+                <option value="" disabled selected>Selecione</option>
                 <option value="Figma">Figma</option>
                 <option value="Sistema (VibeCode)">Sistema (VibeCode)</option>
                 <option value="HubSpot (alterações)">HubSpot (alterações)</option>
@@ -216,87 +718,191 @@
                 <option value="Outro">Outro</option>
               </select>
             </div>
+
             <div class="field">
               <label for="priority">Prioridade</label>
-              <select id="priority" name="priority">
+              <select id="priority" name="priority" class="w-sm">
                 <option value="baixa">Baixa</option>
                 <option value="media" selected>Média</option>
                 <option value="alta">Alta</option>
                 <option value="urgente">Urgente</option>
               </select>
             </div>
-            <div class="field">
-              <label for="requester">Nome do solicitante *</label>
-              <input id="requester" name="requester" placeholder="Quem está pedindo a demanda" required />
-            </div>
-            <div class="field">
-              <label for="area">Área do solicitante *</label>
-              <select id="area" name="area" required>
-                <option value="" disabled selected>Selecione...</option>
-                <option value="Comercial">Comercial</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Outro">Outro</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="contact">Contato do solicitante</label>
-              <input id="contact" name="contact" placeholder="E-mail, ramal ou WhatsApp" />
-            </div>
-            <div class="field">
-              <label for="dueDate">Prazo de entrega desejado</label>
-              <input id="dueDate" name="dueDate" placeholder="AAAA-MM-DD ou texto livre" />
-            </div>
-          </div>
 
-          <div class="field full" style="margin-top: 16px">
-            <label>Gravação</label>
-            <div class="record-box">
-              <button type="button" id="recordBtn" class="record-btn">
-                <span class="dot"></span>
-                <span id="recordLabel">GRAVAR</span>
-              </button>
-              <p class="hint" id="recordHint">Grave um áudio para transcrever automaticamente na Descrição.</p>
+            <div class="field">
+              <label for="dueDate">Prazo desejado</label>
+              <input id="dueDate" name="dueDate" class="w-sm" placeholder="AAAA-MM-DD" />
             </div>
-          </div>
+          </section>
 
-          <div class="field full" style="margin-top: 16px">
-            <label for="description">Descrição detalhada</label>
-            <textarea id="description" name="description" placeholder="Explique o contexto, o objetivo e o resultado esperado. Ou grave um áudio acima."></textarea>
-          </div>
+          <section class="sec">
+            <h2 class="sec-head">
+              <span class="sec-num">03</span>
+              <span>Contexto</span>
+              <span class="sec-note">transcrição automática</span>
+            </h2>
+
+            <div class="field">
+              <p class="fieldlabel">Entrada de áudio</p>
+              <div class="recorder">
+                <button type="button" id="recordBtn" class="rec-btn" data-state="idle" aria-describedby="recStatus">
+                  <span class="rec-dot" aria-hidden="true"></span>
+                  <span id="recordLabel">Gravar</span>
+                </button>
+                <div class="rec-readout">
+                  <div class="rec-line">
+                    <span class="rec-time" id="recTime">00:00</span>
+                    <span class="meter" id="meter" data-live="false" aria-hidden="true"></span>
+                  </div>
+                  <p class="rec-status" id="recStatus" aria-live="polite">
+                    Fale à vontade. O áudio é transcrito e o texto entra na descrição abaixo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="description">Descrição detalhada</label>
+              <textarea
+                id="description"
+                name="description"
+                placeholder="Qual o objetivo? O que já existe hoje? Como você saberá que ficou pronto?"
+              ></textarea>
+            </div>
+          </section>
 
           <div class="actions">
-            <button type="reset" class="btn btn-secondary" id="cancelBtn">CANCELAR</button>
-            <button type="submit" class="btn btn-primary" id="submitBtn">REGISTRAR</button>
+            <button type="submit" class="btn-submit" id="submitBtn">Registrar demanda</button>
+            <button type="reset" class="btn-text" id="cancelBtn">Limpar</button>
+            <span class="required-note">* obrigatório</span>
           </div>
+
+          <div class="alert" id="alert" role="alert"></div>
         </form>
 
-        <div id="result" class="result"></div>
-      </section>
-    </main>
+        <section class="receipt" id="receipt" hidden aria-live="polite">
+          <p class="receipt-label">
+            <span class="pulse" aria-hidden="true"></span>
+            Solicitação registrada
+          </p>
+          <h2>Sua demanda entrou na fila do time.</h2>
+          <dl>
+            <div>
+              <dt>Protocolo</dt>
+              <dd id="rcProtocol"></dd>
+            </div>
+            <div>
+              <dt>Task ID</dt>
+              <dd id="rcTask"></dd>
+            </div>
+            <div>
+              <dt>Acompanhar</dt>
+              <dd id="rcLink"></dd>
+            </div>
+          </dl>
+          <button type="button" class="btn-submit" id="newRequestBtn">Nova solicitação</button>
+        </section>
+      </main>
+    </div>
 
     <script>
       const form = document.getElementById("demandForm");
-      const result = document.getElementById("result");
+      const alertBox = document.getElementById("alert");
       const recordBtn = document.getElementById("recordBtn");
       const recordLabel = document.getElementById("recordLabel");
-      const recordHint = document.getElementById("recordHint");
+      const recStatus = document.getElementById("recStatus");
+      const recTime = document.getElementById("recTime");
+      const meter = document.getElementById("meter");
       const descriptionEl = document.getElementById("description");
       const submitBtn = document.getElementById("submitBtn");
+      const receipt = document.getElementById("receipt");
+      const newRequestBtn = document.getElementById("newRequestBtn");
+
+      const BAR_COUNT = 32;
+      for (let i = 0; i < BAR_COUNT; i++) {
+        meter.appendChild(document.createElement("i"));
+      }
+      const bars = Array.from(meter.children);
 
       let mediaRecorder = null;
       let chunks = [];
       let recordedBlob = null;
+      let timerId = null;
+      let startedAt = 0;
+      let audioCtx = null;
+      let rafId = null;
 
-      function showMessage(type, message) {
-        result.className = `result show ${type}`;
-        result.textContent = message;
+      function showError(message) {
+        alertBox.textContent = message;
       }
 
-      function setHint(text) {
-        recordHint.textContent = text;
+      function clearError() {
+        alertBox.textContent = "";
+      }
+
+      function setStatus(text) {
+        recStatus.textContent = text;
+      }
+
+      function formatTime(ms) {
+        const total = Math.floor(ms / 1000);
+        const mm = String(Math.floor(total / 60)).padStart(2, "0");
+        const ss = String(total % 60).padStart(2, "0");
+        return `${mm}:${ss}`;
+      }
+
+      function startTimer() {
+        startedAt = Date.now();
+        recTime.textContent = "00:00";
+        timerId = setInterval(() => {
+          recTime.textContent = formatTime(Date.now() - startedAt);
+        }, 250);
+      }
+
+      function stopTimer() {
+        clearInterval(timerId);
+        timerId = null;
+      }
+
+      // Medidor de nível: confirma visualmente que o microfone esta captando.
+      function startMeter(stream) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioCtx = new Ctx();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.75;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        meter.dataset.live = "true";
+
+        const draw = () => {
+          analyser.getByteFrequencyData(data);
+          for (let i = 0; i < bars.length; i++) {
+            const value = data[i] / 255;
+            bars[i].style.transform = `scaleY(${Math.max(0.08, value)})`;
+          }
+          rafId = requestAnimationFrame(draw);
+        };
+        draw();
+      }
+
+      function stopMeter() {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        if (audioCtx) {
+          audioCtx.close();
+          audioCtx = null;
+        }
+        meter.dataset.live = "false";
+        bars.forEach((bar) => {
+          bar.style.transform = "scaleY(0.08)";
+        });
       }
 
       async function startRecording() {
+        clearError();
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
@@ -308,30 +914,34 @@
 
           mediaRecorder.onstop = async () => {
             stream.getTracks().forEach((track) => track.stop());
+            stopMeter();
             recordedBlob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
             await transcribeRecording();
           };
 
           mediaRecorder.start();
-          recordBtn.classList.add("recording");
-          recordLabel.textContent = "PARAR";
-          setHint("Gravando... clique em PARAR quando terminar.");
+          startMeter(stream);
+          recordBtn.dataset.state = "recording";
+          recordLabel.textContent = "Parar";
+          startTimer();
+          setStatus("Gravando. Clique em Parar quando terminar.");
         } catch (error) {
-          showMessage("error", `Não foi possível acessar o microfone: ${error.message}`);
+          showError(`Não foi possível acessar o microfone: ${error.message}`);
         }
       }
 
       function stopRecording() {
         if (mediaRecorder && mediaRecorder.state === "recording") {
           mediaRecorder.stop();
-          recordBtn.classList.remove("recording");
-          recordLabel.textContent = "GRAVAR";
+          recordBtn.dataset.state = "idle";
+          recordLabel.textContent = "Gravar";
+          stopTimer();
         }
       }
 
       async function transcribeRecording() {
         if (!recordedBlob) return;
-        setHint("Transcrevendo áudio...");
+        setStatus("Transcrevendo o áudio...");
         recordBtn.disabled = true;
 
         const data = new FormData();
@@ -346,17 +956,18 @@
 
           const transcript = (payload.text || "").trim();
           if (!transcript) {
-            setHint("Nenhuma fala detectada no áudio. Tente novamente.");
+            setStatus("Nenhuma fala detectada. Tente gravar novamente.");
             return;
           }
 
           descriptionEl.value = descriptionEl.value
             ? `${descriptionEl.value}\n\n${transcript}`
             : transcript;
-          setHint("Transcrição adicionada à Descrição. Você pode editar antes de registrar.");
+          setStatus("Texto adicionado à descrição. Revise e ajuste se quiser.");
+          descriptionEl.focus();
         } catch (error) {
-          setHint("Falha ao transcrever.");
-          showMessage("error", `Erro na transcrição: ${error.message}`);
+          setStatus("Não conseguimos transcrever esse áudio.");
+          showError(`Erro na transcrição: ${error.message}`);
         } finally {
           recordBtn.disabled = false;
         }
@@ -372,14 +983,34 @@
 
       form.addEventListener("reset", () => {
         recordedBlob = null;
-        result.className = "result";
-        setHint("Grave um áudio para transcrever automaticamente na Descrição.");
+        stopTimer();
+        stopMeter();
+        recTime.textContent = "00:00";
+        clearError();
+        setStatus("Fale à vontade. O áudio é transcrito e o texto entra na descrição abaixo.");
       });
+
+      function firstInvalidField() {
+        for (const field of form.querySelectorAll("[required]")) {
+          if (!field.value.trim()) return field;
+        }
+        return null;
+      }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        clearError();
+
+        const invalid = firstInvalidField();
+        if (invalid) {
+          const name = invalid.previousElementSibling?.textContent?.replace("*", "").trim() || "campo";
+          showError(`Preencha o campo obrigatório: ${name}.`);
+          invalid.focus();
+          return;
+        }
+
         submitBtn.disabled = true;
-        showMessage("ok", "Registrando demanda...");
+        submitBtn.textContent = "Registrando...";
 
         const data = new FormData(form);
         if (recordedBlob) {
@@ -393,23 +1024,38 @@
             throw new Error(payload.details || payload.error || "Falha inesperada");
           }
 
-          const lines = [
-            `Protocolo: ${payload.protocol}`,
-            `Task criada: ${payload.clickupTaskId}`,
-            payload.clickupTaskUrl ? `Link: ${payload.clickupTaskUrl}` : null,
-            payload.duplicated ? "(Solicitação já existente, duplicidade evitada)" : null
-          ].filter(Boolean);
-
-          showMessage("ok", lines.join("\n"));
-          if (!payload.duplicated) {
-            form.reset();
-            recordedBlob = null;
+          document.getElementById("rcProtocol").textContent = payload.protocol;
+          document.getElementById("rcTask").textContent = payload.clickupTaskId;
+          const linkCell = document.getElementById("rcLink");
+          linkCell.textContent = "";
+          if (payload.clickupTaskUrl) {
+            const anchor = document.createElement("a");
+            anchor.href = payload.clickupTaskUrl;
+            anchor.target = "_blank";
+            anchor.rel = "noopener";
+            anchor.textContent = "Abrir no ClickUp";
+            linkCell.appendChild(anchor);
+          } else {
+            linkCell.textContent = "—";
           }
+
+          form.hidden = true;
+          receipt.hidden = false;
+          receipt.scrollIntoView({ behavior: "smooth", block: "start" });
         } catch (error) {
-          showMessage("error", `Erro ao registrar: ${error.message}`);
+          showError(`Não foi possível registrar: ${error.message}`);
         } finally {
           submitBtn.disabled = false;
+          submitBtn.textContent = "Registrar demanda";
         }
+      });
+
+      newRequestBtn.addEventListener("click", () => {
+        form.reset();
+        recordedBlob = null;
+        form.hidden = false;
+        receipt.hidden = true;
+        window.scrollTo({ top: 0, behavior: "smooth" });
       });
     </script>
   </body>
