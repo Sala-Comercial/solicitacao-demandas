@@ -12,6 +12,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 
 const PORT = Number(process.env.PORT || 3000);
 const CLICKUP_API_BASE = "https://api.clickup.com/api/v2";
+const SASI_API_BASE = process.env.SASI_API_BASE || "https://api.sasi.io";
+const SASI_COOKIE_NAME = process.env.SASI_COOKIE_NAME || "sasi-token";
 
 // Em serverless (Vercel) o filesystem do projeto e somente leitura; so /tmp e gravavel.
 // Localmente usamos ./data para persistir entre reinicios.
@@ -20,7 +22,8 @@ const STORE_DIR = process.env.VERCEL
   : path.join(process.cwd(), "data");
 const IDEMPOTENCY_STORE_PATH = path.join(STORE_DIR, "idempotency-store.json");
 
-app.use(express.static(path.join(process.cwd(), "public")));
+// __dirname em vez de cwd: no serverless o diretorio de trabalho nao e a raiz do projeto.
+app.use(express.static(path.resolve(__dirname, "..", "public")));
 app.use(express.json({ limit: "2mb" }));
 
 const openai = process.env.OPENAI_API_KEY
@@ -33,6 +36,83 @@ function requireEnv(name) {
     throw new Error(`Missing environment variable: ${name}`);
   }
   return value;
+}
+
+function parseCookies(header) {
+  const jar = {};
+  if (!header) return jar;
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator === -1) continue;
+    const key = part.slice(0, separator).trim();
+    if (key) jar[key] = decodeURIComponent(part.slice(separator + 1).trim());
+  }
+  return jar;
+}
+
+// A SASI abre o portal como canal URL e repassa o token do usuario logado naquela
+// sessao. O formato exato da entrega ainda nao foi confirmado no app de producao,
+// entao aceitamos cookie, query string e header.
+//
+// Nao existe token padrao aqui de proposito: sem token o portal cai no
+// preenchimento manual, nunca na identidade de outra pessoa.
+function extractSasiToken(req) {
+  const fromCookie = parseCookies(req.headers.cookie)[SASI_COOKIE_NAME];
+  if (fromCookie) return fromCookie;
+
+  const query = req.query || {};
+  const fromQuery = query[SASI_COOKIE_NAME] || query.sasiToken || query.token;
+  if (fromQuery) return String(fromQuery);
+
+  const fromHeader = req.headers["x-sasi-token"];
+  if (fromHeader) return String(fromHeader);
+
+  const authorization = req.headers.authorization || "";
+  if (authorization.startsWith("Bearer ")) return authorization.slice(7).trim();
+
+  return null;
+}
+
+async function fetchSasiProfile(token) {
+  const response = await fetch(`${SASI_API_BASE}/api/v2/providers/external/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+    // a identificacao nunca pode segurar o carregamento do formulario
+    signal: AbortSignal.timeout(8000)
+  });
+
+  if (!response.ok) {
+    throw new Error(`SASI /external/me failed (${response.status})`);
+  }
+
+  const profile = await response.json();
+  // Email e telefone nao sao campos de primeira classe do MobileProfileDto.
+  // profileProps e o formato padronizado; customProps varia por app e serve de reserva.
+  const props = profile.profileProps || {};
+  const custom = profile.customProps || {};
+
+  return {
+    id: profile.id ? String(profile.id) : null,
+    name: profile.name || props.name || null,
+    email: props.email || custom.email || null,
+    phone: props.phone || custom.phone || null,
+    teamId: profile.TeamId ?? null,
+    appName: profile.App?.name || null
+  };
+}
+
+// Resolve a identidade sempre no servidor: o que o navegador manda no formulario
+// nunca substitui o que a SASI confirma para aquele token.
+async function resolveSasiIdentity(req) {
+  const token = extractSasiToken(req);
+  if (!token) return null;
+
+  try {
+    const profile = await fetchSasiProfile(token);
+    return profile.name ? profile : null;
+  } catch (error) {
+    console.error("sasi identity error", error.message);
+    return null;
+  }
 }
 
 // Idempotencia best-effort: nunca deve quebrar a criacao da task.
@@ -63,18 +143,30 @@ function computePayloadFingerprint(payload) {
 }
 
 function buildTaskDescription(data) {
-  return [
+  const lines = [
     "## Descricao",
     data.description || "Sem descricao informada",
     "",
     "## Detalhes da solicitacao",
     `- Tipo de demanda: ${data.demandType || "Nao informado"}`,
     `- Solicitante: ${data.requester || "Nao informado"}`,
+    `- E-mail: ${data.email || "Nao informado"}`,
     `- Area: ${data.area || "Nao informado"}`,
     `- Prioridade: ${data.priority || "Nao informado"}`,
-    `- Prazo desejado: ${data.dueDate || "Nao informado"}`,
-    `- Canal de contato: ${data.contact || "Nao informado"}`
-  ].join("\n");
+    `- Prazo desejado: ${data.dueDate || "Nao informado"}`
+  ];
+
+  if (data.identity) {
+    lines.push(`- Telefone: ${data.identity.phone || "Nao informado"}`);
+    lines.push(
+      `- Identificacao: SASI (perfil ${data.identity.id}, time ${data.identity.teamId ?? "n/d"})`
+    );
+  } else {
+    lines.push(`- Canal de contato: ${data.contact || "Nao informado"}`);
+    lines.push("- Identificacao: preenchida manualmente");
+  }
+
+  return lines.join("\n");
 }
 
 async function clickUpRequest(url, init = {}) {
@@ -182,6 +274,46 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "clickup-demand-portal" });
 });
 
+app.get("/api/me", async (req, res) => {
+  // resposta contem dado pessoal: nao pode ficar em cache de CDN nem do navegador
+  res.set("Cache-Control", "no-store, private");
+  const identity = await resolveSasiIdentity(req);
+  if (!identity) {
+    return res.json({ identified: false });
+  }
+  return res.json({
+    identified: true,
+    name: identity.name,
+    email: identity.email,
+    phone: identity.phone,
+    teamId: identity.teamId
+  });
+});
+
+// Diagnostico para descobrir como a SASI entrega o token quando o portal roda
+// como canal URL. Expoe apenas nomes de chaves e o token mascarado.
+app.get("/api/sasi-debug", (req, res) => {
+  if (process.env.SASI_DEBUG === "false") {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  res.set("Cache-Control", "no-store, private");
+  const token = extractSasiToken(req);
+  const masked = token
+    ? `${token.slice(0, 8)}...${token.slice(-6)} (${token.length} chars)`
+    : null;
+
+  res.json({
+    cookieNames: Object.keys(parseCookies(req.headers.cookie)),
+    queryKeys: Object.keys(req.query || {}),
+    hasAuthorizationHeader: Boolean(req.headers.authorization),
+    hasXSasiTokenHeader: Boolean(req.headers["x-sasi-token"]),
+    referer: req.headers.referer || null,
+    userAgent: req.headers["user-agent"] || null,
+    tokenFound: masked
+  });
+});
+
 app.post("/api/transcribe", upload.single("audio"), async (req, res) => {
   try {
     if (!req.file) {
@@ -198,14 +330,19 @@ app.post("/api/transcribe", upload.single("audio"), async (req, res) => {
 
 app.post("/api/requests", upload.single("audio"), async (req, res) => {
   try {
+    const identity = await resolveSasiIdentity(req);
+
     const title = String(req.body.title || "").trim();
-    const requester = String(req.body.requester || "").trim();
     const area = String(req.body.area || "").trim();
     const demandType = String(req.body.demandType || "").trim();
-    const contact = String(req.body.contact || "").trim();
     const dueDate = String(req.body.dueDate || "").trim();
     const description = String(req.body.description || "").trim();
     const priority = normalizePriority(req.body.priority);
+
+    // Com token valido a identidade vem da SASI e o que o formulario enviou e ignorado.
+    const requester = identity ? identity.name : String(req.body.requester || "").trim();
+    const email = identity ? identity.email : "";
+    const contact = identity ? "" : String(req.body.contact || "").trim();
 
     if (!title || !requester || !area || !demandType) {
       return res.status(400).json({
@@ -241,11 +378,13 @@ app.post("/api/requests", upload.single("audio"), async (req, res) => {
       description: buildTaskDescription({
         description,
         requester,
+        email,
         area,
         demandType,
         priority,
         dueDate,
-        contact
+        contact,
+        identity
       }),
       priority
     });

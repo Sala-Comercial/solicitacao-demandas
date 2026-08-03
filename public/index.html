@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Se a SASI entregar o token na query string, o Referer nao pode carregar a URL
+         completa para terceiros (fontes, CDNs). Enviamos apenas a origem. -->
+    <meta name="referrer" content="strict-origin" />
     <title>Intake de demandas · Time de IA · SASI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -345,6 +348,53 @@
       .w-md { max-width: 18rem; }
       .w-lg { max-width: 25rem; }
 
+      [hidden] {
+        display: none !important;
+      }
+
+      /* ---------- identidade vinda da SASI ---------- */
+
+      .identity {
+        border: 1px solid var(--rule);
+        border-left: 2px solid var(--signal);
+        background: var(--panel);
+        padding: 0.9rem 1.1rem;
+        margin-bottom: 1.4rem;
+      }
+
+      .identity div {
+        display: grid;
+        grid-template-columns: 5rem 1fr;
+        gap: 0.75rem;
+        padding: 0.2rem 0;
+      }
+
+      .identity dt {
+        font-family: var(--mono);
+        font-size: 0.625rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--dim);
+        padding-top: 0.25rem;
+      }
+
+      .identity dd {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 0.875rem;
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      .identity-foot {
+        margin: 0.7rem 0 0;
+        padding-top: 0.7rem;
+        border-top: 1px solid var(--rule);
+        font-size: 0.75rem;
+        color: var(--dim);
+        text-wrap: pretty;
+      }
+
       /* ---------- recorder instrument ---------- */
 
       .recorder {
@@ -672,9 +722,24 @@
             <h2 class="sec-head">
               <span class="sec-num">01</span>
               <span>Solicitante</span>
+              <span class="sec-note" id="identityNote" hidden>identificado pela SASI</span>
             </h2>
 
-            <div class="field">
+            <dl class="identity" id="identity" hidden>
+              <div>
+                <dt>Nome</dt>
+                <dd id="idName"></dd>
+              </div>
+              <div>
+                <dt>E-mail</dt>
+                <dd id="idEmail"></dd>
+              </div>
+              <p class="identity-foot">
+                Reconhecemos você pela sua sessão no app, então não precisa se identificar.
+              </p>
+            </dl>
+
+            <div class="field" id="requesterField">
               <label for="requester">Nome<span class="req" aria-hidden="true">*</span></label>
               <input id="requester" name="requester" class="w-lg" autocomplete="name" required />
             </div>
@@ -689,7 +754,7 @@
               </select>
             </div>
 
-            <div class="field">
+            <div class="field" id="contactField">
               <label for="contact">Contato</label>
               <input id="contact" name="contact" class="w-lg" placeholder="E-mail, ramal ou WhatsApp" />
               <p class="help">Por onde falamos com você se surgir alguma dúvida.</p>
@@ -817,6 +882,14 @@
       const submitBtn = document.getElementById("submitBtn");
       const receipt = document.getElementById("receipt");
       const newRequestBtn = document.getElementById("newRequestBtn");
+      const identityBox = document.getElementById("identity");
+      const identityNote = document.getElementById("identityNote");
+      const idName = document.getElementById("idName");
+      const idEmail = document.getElementById("idEmail");
+      const requesterField = document.getElementById("requesterField");
+      const requesterInput = document.getElementById("requester");
+      const contactField = document.getElementById("contactField");
+      const contactInput = document.getElementById("contact");
 
       const BAR_COUNT = 32;
       for (let i = 0; i < BAR_COUNT; i++) {
@@ -824,6 +897,26 @@
       }
       const bars = Array.from(meter.children);
 
+      // Se a SASI entregar o token pela URL, ele sai da barra de enderecos assim que
+      // e lido: query string sobrevive em historico, bookmarks e logs de acesso.
+      // Quando vier por cookie, este bloco nao encontra nada e o cookie segue sozinho.
+      const sasiToken = (() => {
+        const params = new URLSearchParams(window.location.search);
+        const keys = ["sasi-token", "sasiToken", "token"];
+        const found = keys.map((key) => params.get(key)).find(Boolean);
+        if (!found) return null;
+
+        keys.forEach((key) => params.delete(key));
+        const rest = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (rest ? `?${rest}` : ""));
+        return found;
+      })();
+
+      function authHeaders() {
+        return sasiToken ? { "x-sasi-token": sasiToken } : {};
+      }
+
+      let identity = null;
       let mediaRecorder = null;
       let chunks = [];
       let recordedBlob = null;
@@ -831,6 +924,40 @@
       let startedAt = 0;
       let audioCtx = null;
       let rafId = null;
+
+      // Quando a SASI identifica o usuario, os campos de nome e contato saem de cena.
+      // Sem identificacao o formulario continua manual, para o portal seguir
+      // utilizavel fora do app.
+      function applyIdentity() {
+        if (!identity) return;
+        idName.textContent = identity.name;
+        idEmail.textContent = identity.email || "não informado";
+        identityBox.hidden = false;
+        identityNote.hidden = false;
+        requesterField.hidden = true;
+        contactField.hidden = true;
+        requesterInput.required = false;
+        requesterInput.value = identity.name;
+        contactInput.value = identity.email || "";
+      }
+
+      async function loadIdentity() {
+        try {
+          const response = await fetch("/api/me", {
+            credentials: "include",
+            headers: authHeaders()
+          });
+          if (!response.ok) return;
+          const data = await response.json();
+          if (!data.identified) return;
+          identity = data;
+          applyIdentity();
+        } catch {
+          // sem identificacao o formulario manual ja e o estado padrao
+        }
+      }
+
+      loadIdentity();
 
       function showError(message) {
         alertBox.textContent = message;
@@ -901,9 +1028,28 @@
         });
       }
 
+      function microphoneErrorMessage(error) {
+        if (!window.isSecureContext) {
+          return "A gravação exige uma conexão segura (HTTPS). Abra o portal pelo endereço https.";
+        }
+        if (error.name === "NotAllowedError" && window.self !== window.top) {
+          return "O microfone está bloqueado. O canal na SASI precisa liberar a permissão de microfone para a gravação funcionar.";
+        }
+        if (error.name === "NotAllowedError") {
+          return "Permissão de microfone negada. Libere o acesso nas configurações do navegador e tente de novo.";
+        }
+        if (error.name === "NotFoundError") {
+          return "Nenhum microfone foi encontrado neste dispositivo.";
+        }
+        return `Não foi possível acessar o microfone: ${error.message}`;
+      }
+
       async function startRecording() {
         clearError();
         try {
+          if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error("Este navegador não expõe acesso ao microfone.");
+          }
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
           chunks = [];
@@ -926,7 +1072,7 @@
           startTimer();
           setStatus("Gravando. Clique em Parar quando terminar.");
         } catch (error) {
-          showError(`Não foi possível acessar o microfone: ${error.message}`);
+          showError(microphoneErrorMessage(error));
         }
       }
 
@@ -988,6 +1134,8 @@
         recTime.textContent = "00:00";
         clearError();
         setStatus("Fale à vontade. O áudio é transcrito e o texto entra na descrição abaixo.");
+        // o evento dispara antes de o navegador limpar os campos
+        setTimeout(applyIdentity, 0);
       });
 
       function firstInvalidField() {
@@ -1018,7 +1166,12 @@
         }
 
         try {
-          const response = await fetch("/api/requests", { method: "POST", body: data });
+          const response = await fetch("/api/requests", {
+            method: "POST",
+            body: data,
+            credentials: "include",
+            headers: authHeaders()
+          });
           const payload = await response.json();
           if (!response.ok) {
             throw new Error(payload.details || payload.error || "Falha inesperada");
