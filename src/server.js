@@ -194,6 +194,7 @@ const DEMAND_TYPE_TAGS = {
   "Sistema (VibeCode)": "sistema",
   "HubSpot (alterações)": "hubspot",
   "App SASI": "sasi",
+  "Apresentação (Slides)": "apresentacao",
   Outro: "outro"
 };
 
