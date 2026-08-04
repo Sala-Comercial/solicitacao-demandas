@@ -143,30 +143,7 @@ function computePayloadFingerprint(payload) {
 }
 
 function buildTaskDescription(data) {
-  const lines = [
-    "## Descricao",
-    data.description || "Sem descricao informada",
-    "",
-    "## Detalhes da solicitacao",
-    `- Tipo de demanda: ${data.demandType || "Nao informado"}`,
-    `- Solicitante: ${data.requester || "Nao informado"}`,
-    `- E-mail: ${data.email || "Nao informado"}`,
-    `- Area: ${data.area || "Nao informado"}`,
-    `- Prioridade: ${data.priority || "Nao informado"}`,
-    `- Prazo desejado: ${data.dueDate || "Nao informado"}`
-  ];
-
-  if (data.identity) {
-    lines.push(`- Telefone: ${data.identity.phone || "Nao informado"}`);
-    lines.push(
-      `- Identificacao: SASI (perfil ${data.identity.id}, time ${data.identity.teamId ?? "n/d"})`
-    );
-  } else {
-    lines.push(`- Canal de contato: ${data.contact || "Nao informado"}`);
-    lines.push("- Identificacao: preenchida manualmente");
-  }
-
-  return lines.join("\n");
+  return String(data.description || "").trim();
 }
 
 async function clickUpRequest(url, init = {}) {
@@ -203,6 +180,68 @@ function tagsForDemandType(demandType) {
   return tag ? [tag] : [];
 }
 
+// Campos customizados da lista Demandas.
+const AREA_FIELD_ID =
+  process.env.CLICKUP_AREA_FIELD_ID || "19579c08-277c-4822-b130-f22ae71ab90f";
+const NAME_FIELD_ID =
+  process.env.CLICKUP_NAME_FIELD_ID || "a56537b4-4b84-472b-a301-374624a6093f";
+const EMAIL_FIELD_ID =
+  process.env.CLICKUP_EMAIL_FIELD_ID || "6d860a90-2704-4229-a387-7b54050e7647";
+
+// Aliases do formulario -> nome da opcao no ClickUp
+const AREA_ALIASES = {
+  outro: "outros"
+};
+
+let areaOptionsCache = null;
+
+async function getAreaOptionId(areaName) {
+  if (!areaName) return null;
+
+  if (!areaOptionsCache) {
+    try {
+      const data = await clickUpRequest(
+        `${CLICKUP_API_BASE}/list/${requireEnv("CLICKUP_LIST_ID")}/field`
+      );
+      const field = (data.fields || []).find((f) => f.id === AREA_FIELD_ID);
+      const options = field?.type_config?.options || [];
+      areaOptionsCache = new Map(
+        options.map((opt) => [String(opt.name).trim().toLowerCase(), opt.id])
+      );
+    } catch (error) {
+      console.error("failed to load ClickUp area options", error.message);
+      areaOptionsCache = new Map();
+    }
+  }
+
+  const key = String(areaName).trim().toLowerCase();
+  return areaOptionsCache.get(key) || areaOptionsCache.get(AREA_ALIASES[key]) || null;
+}
+
+function parseDueDateMs(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  // aceita AAAA-MM-DD ou timestamps ja em ms
+  if (/^\d{10,13}$/.test(raw)) {
+    const n = Number(raw);
+    return n < 1e12 ? n * 1000 : n;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const ms = Date.parse(`${raw}T12:00:00`);
+    return Number.isNaN(ms) ? null : ms;
+  }
+  const ms = Date.parse(raw);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function resolveEmail(taskInput) {
+  const email = String(taskInput.email || "").trim();
+  if (email) return email;
+  const contact = String(taskInput.contact || "").trim();
+  if (contact.includes("@")) return contact;
+  return "";
+}
+
 async function createClickUpTask(taskInput) {
   const listId = requireEnv("CLICKUP_LIST_ID");
   const payload = {
@@ -216,6 +255,31 @@ async function createClickUpTask(taskInput) {
   if (taskInput.priority === "alta") payload.priority = 2;
   if (taskInput.priority === "media") payload.priority = 3;
   if (taskInput.priority === "baixa") payload.priority = 4;
+
+  const dueDateMs = parseDueDateMs(taskInput.dueDate);
+  if (dueDateMs) payload.due_date = dueDateMs;
+
+  const customFields = [];
+
+  const areaOptionId = await getAreaOptionId(taskInput.area);
+  if (areaOptionId) {
+    customFields.push({ id: AREA_FIELD_ID, value: areaOptionId });
+  } else if (taskInput.area) {
+    console.warn(
+      `Área Solicitante: opção "${taskInput.area}" nao encontrada no ClickUp.`
+    );
+  }
+
+  if (taskInput.requester) {
+    customFields.push({ id: NAME_FIELD_ID, value: taskInput.requester });
+  }
+
+  const email = resolveEmail(taskInput);
+  if (email) {
+    customFields.push({ id: EMAIL_FIELD_ID, value: email });
+  }
+
+  if (customFields.length) payload.custom_fields = customFields;
 
   return clickUpRequest(`${CLICKUP_API_BASE}/list/${listId}/task`, {
     method: "POST",
@@ -284,7 +348,7 @@ async function cleanupTranscript(text) {
 function normalizePriority(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (["baixa", "media", "alta", "urgente"].includes(normalized)) return normalized;
-  return "media";
+  return "baixa";
 }
 
 app.get("/api/health", (req, res) => {
@@ -367,6 +431,12 @@ app.post("/api/requests", upload.single("audio"), async (req, res) => {
       });
     }
 
+    if (!description && !req.file) {
+      return res.status(400).json({
+        error: "Description is required: provide text or an audio recording"
+      });
+    }
+
     const payloadFingerprint = computePayloadFingerprint({
       title,
       requester,
@@ -392,19 +462,14 @@ app.post("/api/requests", upload.single("audio"), async (req, res) => {
 
     const task = await createClickUpTask({
       title,
-      description: buildTaskDescription({
-        description,
-        requester,
-        email,
-        area,
-        demandType,
-        priority,
-        dueDate,
-        contact,
-        identity
-      }),
+      description: buildTaskDescription({ description }),
       priority,
-      demandType
+      demandType,
+      area,
+      requester,
+      email,
+      contact,
+      dueDate
     });
 
     if (req.file) {

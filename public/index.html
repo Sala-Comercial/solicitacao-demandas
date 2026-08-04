@@ -683,10 +683,6 @@
             <dt>03</dt>
             <dd>A solicitação entra no quadro do time para priorização.</dd>
           </div>
-          <div>
-            <dt>04</dt>
-            <dd>Você recebe um protocolo para acompanhar o andamento.</dd>
-          </div>
         </dl>
       </aside>
 
@@ -724,7 +720,7 @@
                 <option value="" disabled selected>Selecione</option>
                 <option value="Comercial">Comercial</option>
                 <option value="Marketing">Marketing</option>
-                <option value="Outro">Outro</option>
+                <option value="Outros">Outros</option>
               </select>
             </div>
 
@@ -762,16 +758,20 @@
             <div class="field">
               <label for="priority">Prioridade</label>
               <select id="priority" name="priority" class="w-sm">
+                <option value="" selected>Selecione</option>
                 <option value="baixa">Baixa</option>
-                <option value="media" selected>Média</option>
+                <option value="media">Média</option>
                 <option value="alta">Alta</option>
                 <option value="urgente">Urgente</option>
               </select>
+              <p class="help">
+                Se você não estipular o grau de prioridade, a demanda será tratada automaticamente como baixa prioridade.
+              </p>
             </div>
 
             <div class="field">
               <label for="dueDate">Prazo desejado</label>
-              <input id="dueDate" name="dueDate" class="w-sm" placeholder="AAAA-MM-DD" />
+              <input id="dueDate" name="dueDate" type="date" class="w-sm" />
             </div>
           </section>
 
@@ -802,12 +802,13 @@
             </div>
 
             <div class="field">
-              <label for="description">Descrição detalhada</label>
+              <label for="description">Descrição detalhada<span class="req" aria-hidden="true">*</span></label>
               <textarea
                 id="description"
                 name="description"
                 placeholder="Qual o objetivo? O que já existe hoje? Como você saberá que ficou pronto?"
               ></textarea>
+              <p class="help">Obrigatória: digite o texto ou grave um áudio para transcrever.</p>
             </div>
           </section>
 
@@ -1114,6 +1115,10 @@
         return null;
       }
 
+      function hasDescriptionOrAudio() {
+        return Boolean(descriptionEl.value.trim() || recordedBlob);
+      }
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         clearError();
@@ -1123,6 +1128,12 @@
           const name = invalid.previousElementSibling?.textContent?.replace("*", "").trim() || "campo";
           showError(`Preencha o campo obrigatório: ${name}.`);
           invalid.focus();
+          return;
+        }
+
+        if (!hasDescriptionOrAudio()) {
+          showError("Informe a descrição: digite o texto ou grave um áudio.");
+          descriptionEl.focus();
           return;
         }
 
