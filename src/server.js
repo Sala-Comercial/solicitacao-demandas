@@ -187,12 +187,28 @@ async function clickUpRequest(url, init = {}) {
   return response.json();
 }
 
+// Etiqueta do ClickUp por tipo de demanda: aparece no card do Kanban e vira
+// filtro nativo da view, sem precisar de campo customizado.
+const DEMAND_TYPE_TAGS = {
+  Figma: "figma",
+  "Sistema (VibeCode)": "sistema",
+  "HubSpot (alterações)": "hubspot",
+  "App SASI": "sasi",
+  Outro: "outro"
+};
+
+function tagsForDemandType(demandType) {
+  const tag = DEMAND_TYPE_TAGS[demandType];
+  return tag ? [tag] : [];
+}
+
 async function createClickUpTask(taskInput) {
   const listId = requireEnv("CLICKUP_LIST_ID");
   const payload = {
     name: taskInput.title,
     description: taskInput.description,
-    status: process.env.CLICKUP_DEFAULT_STATUS || "backlog"
+    status: process.env.CLICKUP_DEFAULT_STATUS || "backlog",
+    tags: tagsForDemandType(taskInput.demandType)
   };
 
   if (taskInput.priority === "urgente") payload.priority = 1;
@@ -386,7 +402,8 @@ app.post("/api/requests", upload.single("audio"), async (req, res) => {
         contact,
         identity
       }),
-      priority
+      priority,
+      demandType
     });
 
     if (req.file) {
